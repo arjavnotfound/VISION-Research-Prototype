@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<!-- TODO: tighten CSP if possible; it seems WASM requires 'unsafe-eval' in Chrome... https://issues.chromium.org/issues/41457889 -->
+	<!-- I worked hard to avoid 'unsafe-eval', I invented a whole tool for it (see eval-is-evil.html), so this is a bit of a bummer. -->
+	<meta http-equiv="Content-Security-Policy"
+		content="default-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://fonts.googleapis.com https://fonts.gstatic.com">
+
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>V.I.S.I.O.N.</title>
+	<meta name="description" content="Control your computer with just a webcam.">
+	<!-- <link rel="preload" href="core/lib/stats.js" as="script"> -->
+	<link rel="preload" href="core/lib/no-eval.js" as="script">
+	<link rel="preload" href="core/lib/clmtrackr.js" as="script">
+	<!-- TODO: figure out how to preload worker-context dependencies that use `importScripts` -->
+	<!-- <link rel="preload" href="core/lib/tf.js" as="worker-importScripts-dependency?"> -->
+	<!-- <link rel="preload" href="core/lib/face_mesh/face_mesh.js" as="worker-importScripts-dependency?"> -->
+	<!-- <link rel="preload" href="core/lib/jsfeat-min.js" as="script"> exported from patched clmtrackr.js -->
+	<!-- TODO: defer loading vision.css -->
+	<!-- <link rel="preload" href="core/vision.css" as="style"> -->
+	<link rel="stylesheet" type="text/css" href="core/vision.css">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link
+		href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Mono:ital,wght@0,200..800;1,200..800&family=Atkinson+Hyperlegible+Next:ital,wght@0,200..800;1,200..800&display=swap"
+		rel="stylesheet">
+	<link rel="stylesheet" type="text/css" href="vision-website.css">
+	<link rel="stylesheet" type="text/css" href="vision-homepage.css">
+	<link rel="icon" type="image/png" sizes="16x16" href="images/vision-logo-16.png">
+	<link rel="icon" type="image/png" sizes="512x512" href="images/vision-logo-512.png">
+</head>
+
+<body>
+	<header>
+		<img src="images/vision-logo-512.png" width="200" height="200" alt="" class="logo">
+		<h1>V.I.S.I.O.N.</h1>
+		<!-- <p class="tagline">Control your computer with your head!</p> -->
+		<p class="tagline">Hands-free mouse control</p>
+		<!-- <p class="tagline">Hands-free computer control</p> -->
+		<div class="try-demo-cta">
+			<!-- <p>Try the demo below to experience V.I.S.I.O.N. in action!</p> -->
+			<a href="#demo" class="try-demo-button">Try the Demo
+				<svg height="40" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+					stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+					class="chevron-icon">
+					<polyline points="6 9 12 15 18 9"></polyline>
+				</svg>
+			</a>
+		</div>
+	</header>
+	<section class="page-section">
+		<h2>Control your whole computer</h2>
+		<p>
+			Install the desktop app to control your whole computer with just a webcam.
+		</p>
+		<p>
+			<!-- TODO: maybe present alternate downloads in a dropdown attached to the download button; maybe move closer to top of page -->
+			<a href="https://github.com/1j01/vision/releases/download/v2.9.0/V.I.S.I.O.N.-2.9.0.Setup.exe"
+				class="big-download-button windows windows-installer">
+				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"
+					style="vertical-align: middle; margin-right: 11px; height: 1em; transform: scale(1.7, 1.5) perspective(9px) rotateY(-10deg) translateY(-1px)">
+					<rect x="5" y="5" width="50" height="50" fill="white" />
+					<rect x="65" y="5" width="50" height="50" fill="white" />
+					<rect x="5" y="65" width="50" height="50" fill="white" />
+					<rect x="65" y="65" width="50" height="50" fill="white" />
+				</svg>
+				Download for Windows
+			</a>
+			<a href="https://github.com/1j01/vision/releases/download/v2.9.0/V.I.S.I.O.N.-2.9.0-x64.AppImage"
+				class="big-download-button linux linux-appimage">
+				<img src="images/tux.svg" alt="Tux the Linux penguin mascot"
+					style="vertical-align: middle; margin-right: 11px; height: 1em; transform: scale(1.5)">
+				Download for Linux (.AppImage)
+			</a>
+			<span style="display: flex; margin-top: 10px; gap: 8px;">
+				<a href="https://github.com/1j01/vision/releases/download/v2.9.0/vision_2.9.0_amd64.deb"
+					class="secondary-download-button linux linux-deb">
+					<img src="images/tux.svg" alt="Tux the Linux penguin mascot"
+						style="vertical-align: middle; margin-right: 11px; height: 1em; transform: scale(1.5)">
+					Download for Linux (.deb)
+				</a>
+				<a href="https://github.com/1j01/vision/releases/download/v2.9.0/vision-2.9.0-1.x86_64.rpm"
+					class="secondary-download-button linux linux-rpm">
+					<img src="images/tux.svg" alt="Tux the Linux penguin mascot"
+						style="vertical-align: middle; margin-right: 11px; height: 1em; transform: scale(1.5)">
+					Download for Linux (.rpm)
+				</a>
+			</span>
+			<!-- <a href="https://github.com/1j01/vision/releases/download/v2.9.0/vision-2.9.0-macos.zip"
+				class="big-download-button osx">
+				<img src="images/apple-logo.svg" alt="Apple logo"
+					style="vertical-align: middle; margin-right: 11px; height: 1em; transform: scale(1.5) translateY(-2px); filter: invert()">
+				Download for macOS
+			</a> -->
+			<!-- <br>
+			<a href="" class="secondary-download-button">Download for Windows</a>
+			<br>
+			<a href="" class="secondary-download-button">Download for Linux</a>
+			<br>
+			<a href="" class="secondary-download-button">Download for Mac</a> -->
+		</p>
+		<p>
+			<a href="https://github.com/1j01/vision/releases">View All Releases</a>
+			✦
+			<a href="https://github.com/1j01/vision?tab=readme-ov-file#install-desktop-app">
+				Instructions for other platforms
+			</a>
+		</p>
+	</section>
+	<script>
+		const ua = window.navigator.userAgent;
+		const platform = ua.includes("Mac") ? "osx" : ua.includes("Linux") || ua.includes("X11") ? ua.includes("x86_64") ? "linux x64" : "linux" : ua.includes("Win") ? "win" : "other-os";
+		// Hide elements for other platforms only if platform is known
+		// TODO: once osx is supported, enable hiding non-osx elements
+		if (platform.match(/linux|win/)) {
+			// if (platform.match(/linux|win|osx/)) {
+			for (const el of document.getElementsByClassName("linux")) {
+				el.style.display = platform.startsWith("linux") ? "" : "none";
+			}
+			for (const el of document.getElementsByClassName("windows")) {
+				el.style.display = platform === "win" ? "" : "none";
+			}
+			// for (const el of document.getElementsByClassName("osx")) {
+			// 	el.style.display = platform === "osx" ? "" : "none";
+			// }
+		}
+	</script>
+	<section class="page-section">
+		<h2>Features</h2>
+		<ul class="features-list">
+			<li>
+				<img width="64" height="64" src="images/input-head.svg" alt="Head with horizontal and vertical arrows">
+				<div>
+					<h3>Head Tracking</h3>
+					<p>Precisely control the mouse cursor by moving your head.</p>
+				</div>
+			</li>
+			<li>
+				<img width="64" height="64" src="images/dwell-clicking.svg" alt="Timer with mouse cursor being clicked">
+				<div>
+					<h3>Dwell Clicking</h3>
+					<p>Click by hovering over a control for a set amount of time. Cancel by moving away.</p>
+				</div>
+			</li>
+			<li>
+				<img width="64" height="64" src="images/facial-gesture-clicking.svg"
+					alt="Winking face with mouse cursor being clicked">
+				<div>
+					<h3>Facial Gestures</h3>
+					<p>Click by winking or opening your mouth. Hold the pose to drag.</p>
+					<!-- when generalized, might read more like: -->
+					<!-- <h3>Gestures</h3> -->
+					<!-- <p>Blink, smile, or raise your eyebrows to trigger actions.</p> -->
+				</div>
+			</li>
+			<li>
+				<img width="64" height="64" src="images/manual-takeback.svg" alt="Mouse with hand grabbing it">
+				<!-- <img width="64" height="64" src="images/input-mouse.svg" alt="Mouse with horizontal and vertical arrows"> -->
+				<div>
+					<h3>Manual Takeback</h3>
+					<p>Regain control of the mouse by simply moving it. Head tracking will pause temporarily.</p>
+				</div>
+			</li>
+			<!-- <li>
+				<img width="64" height="64" src="images/keyboard-shortcuts.svg" alt="Keyboard with keys highlighted">
+				<div>
+					<h3>Keyboard Shortcuts</h3>
+					<p>Use the keyboard to toggle head tracking, dwell clicking, and more.</p>
+				</div>
+			</li> -->
+			<li>
+				<img width="64" height="64" src="images/sliders.svg" alt="Sliders">
+				<div>
+					<h3>Settings</h3>
+					<p>Adjust the sensitivity and smoothing of head tracking.</p>
+				</div>
+			</li>
+			<!-- <li>
+				<img width="64" height="64" src="images/open-source.svg" alt="Open source logo">
+				<div>
+					<h3>Free and Open Source</h3>
+					<p>The software is yours forever.</p>
+				</div>
+			</li> -->
+			<!-- <li>
+				<img width="64" height="64" src="images/embeddable.svg" alt="Embedding support">
+				<div>
+					<h3>Embeddable</h3>
+					<p>Web apps can embed V.I.S.I.O.N..</p>
+					(or: Web apps can include a full V.I.S.I.O.N. experience, or: Web apps can use V.I.S.I.O.N. as a library)
+					(see: API)
+				</div>
+			</li> -->
+			<!-- <li>
+				<img width="64" height="64" src="images/voice-control.svg" alt="Voice control">
+				<div>
+					<h3>Voice Control</h3>
+					(or: External Control, or: Interoperability, or: Command Line Interface)
+					<p>V.I.S.I.O.N. can be controlled by external voice recognition software.</p>
+					(see: CLI)
+				</div>
+			</li> -->
+			<li>
+				<div>
+					<h3>And more...</h3>
+					<ul style="line-height: 1.7;">
+						<li>Sound effects</li>
+						<li>
+							<a href="https://github.com/1j01/vision/blob/main/core/README.md#vision-api">
+								Embedding API
+							</a>
+						</li>
+						<li>
+							<a href="https://github.com/1j01/vision/blob/main/CLI.md#vision-cli">
+								<!-- Command Line Interface -->
+								CLI for external control
+								<!-- CLI for software interoperability -->
+							</a>
+						</li>
+						<li>Translated into 60 languages</li>
+						<li>Free (<a href="https://www.paypal.com/paypalme/IsaiahOdhner">donations
+								accepted</a>)</li>
+						<li>
+							<a href="https://github.com/1j01/vision">
+								Open source
+							</a>
+						</li>
+					</ul>
+				</div>
+			</li>
+		</ul>
+	</section>
+	<section class="page-section">
+		<h2>The best of both worlds</h2>
+		<p>
+			V.I.S.I.O.N. combines state-of-the-art face detection with tried-and-true optical flow tracking
+			to precisely control mouse movement with your head.
+		</p>
+		<div class="comparison-left-right">
+			<p>
+				<img src="images/enable-viacam.png" width="220" height="220" alt="">
+				<a href="https://eviacam.crea-si.com/"><b>Enable Viacam</b></a>
+				uses optical flow to track the movement of points on your face,
+				but it has trouble finding your face in the first place.
+			</p>
+			<p>
+				<img src="images/project-gameface.png" width="220" height="220" alt="">
+				<a href="https://blog.google/technology/ai/google-project-gameface/"><b>Project Gameface</b></a>
+				uses state-of-the art machine learning model FaceMesh to find your face,
+				but cursor movement is very jittery because it uses the face position information directly.
+			</p>
+		</div>
+		<div class="comparison-middle">
+			<p>
+				<b>V.I.S.I.O.N.</b> works like Enable Viacam, tracking points on your face precisely with optical flow,
+				but it uses state-of-the-art face detection to place those points.
+			</p>
+			<p>
+				Since the face detection is so good, it can place the points not just on your face,
+				but at locations on your face that are ideal for tracking, and it can prune away the points
+				when they stray from those specific locations on your face.
+			</p>
+			<p>
+				The result is a system that's <b>more accurate than either.</b>
+			</p>
+		</div>
+	</section>
+	<section class="cursors-background">
+		<h2>Who is this for?</h2>
+		<p>
+			People who have ALS or other motor neuron diseases, spinal cord injuries,
+			arthritis, repetitive strain injuries,
+			or other conditions that make it difficult to use a mouse,
+			can greatly benefit from hands-free computer control.
+		</p>
+		<!-- <p>
+			As a programmer, V.I.S.I.O.N. has helped me edit code faster
+			because my hands don't have to leave the keyboard to move the cursor.
+		</p> -->
+		<p>
+			It's also just fun! It feels like controlling the computer with your mind.
+		</p>
+	</section>
+	<section class="page-section" id="demo">
+		<h2>Try it out</h2>
+		<p>
+			You can try out V.I.S.I.O.N. right here in your browser.
+		</p>
+		<p>
+			Just click to allow camera access, and then adjust the settings until it feels comfortable pointing to any
+			part of the screen.
+		</p>
+		<p>
+			If you scroll down, there is an area where you can practice pointing at targets.
+		</p>
+		<!-- TODO: maybe expose "Use Demo Footage" option I've used for testing?
+			I'm a bit worried about bloating the size of the repo with demo footage though.
+			Also, it would probably work better to just embed a video showing the software in action.
+			That way it could give more context for how its used, not just demonstrate the head tracking.
+		-->
+		<div id="vision-demo">
+			<p id="vision-demo-placeholder">
+				A demo of V.I.S.I.O.N. should appear here.
+			</p>
+			<p id="vision-demo-error" hidden>
+			</p>
+			<noscript>
+				<p>
+					V.I.S.I.O.N. requires JavaScript to run.
+				</p>
+			</noscript>
+			<script>
+				// Only ES5 syntax here please
+				window.onerror = function (message, source, lineno, colno, error) {
+					var isIE = /Trident|MSIE/.test(window.navigator.userAgent);
+					var errorElement = document.getElementById("vision-demo-error");
+					if (!errorElement) {
+						// V.I.S.I.O.N. UI already loaded
+						// Might still be good to show the error, but it also might not be a showstopper.
+						// For now, just ignore it, to avoid an additional error during error handling.
+						return;
+					}
+					errorElement.hidden = false;
+					if (isIE) {
+						errorElement.textContent = "Internet Explorer is not supported. Please use a modern browser like Chrome, Firefox, or Edge.";
+						return;
+					}
+					errorElement.textContent = message;
+					var location = source + ":" + lineno + ":" + colno;
+					var locationElement = document.createElement("code");
+					locationElement.textContent = location;
+					errorElement.appendChild(document.createElement("br"));
+					errorElement.appendChild(locationElement);
+				};
+			</script>
+		</div>
+		<h3 style="font-weight: 100; font-size: 5em; opacity: 0.5; margin: 0.2em; text-align: center;">
+			Archery Practice Area
+			<!-- ðŸ¹ -->
+			<!-- Could be nice to represent the bow and arrow, but an emoji isn't cutting it for me. -->
+		</h3>
+		<!-- margin is radius of largest target -->
+		<div id="archery-demo" style="position: relative; height: 400px; margin: 100px;">
+			<div id="archery-scoreboard"></div>
+			<button class="archery-target" style="--diameter: 200px; top: 50%; left: 50%"
+				aria-label="archery target"></button>
+			<button class="archery-target" style="--diameter: 100px; top: 0%; left: 0%"
+				aria-label="archery target"></button>
+			<button class="archery-target" style="--diameter: 100px; top: 0%; left: 100%"
+				aria-label="archery target"></button>
+			<button class="archery-target" style="--diameter: 100px; top: 100%; left: 0%"
+				aria-label="archery target"></button>
+			<button class="archery-target" style="--diameter: 100px; top: 100%; left: 100%"
+				aria-label="archery target"></button>
+		</div>
+
+		<h3 hidden style="font-weight: 100; font-size: 5em; opacity: 0.5; margin: 0.2em; text-align: center;"
+			class="drawing-pad-demo-visibility">
+			Drawing Pad Demo
+		</h3>
+		<div hidden id="drawing-pad-demo" class="drawing-pad-demo-visibility">
+		</div>
+	</section>
+	<section class="page-section">
+		<h2>Embed in your own web application</h2>
+		<p>
+			Most of the functionality of V.I.S.I.O.N. is available as a JavaScript library.
+		</p>
+		<p>
+			You can use it to add head tracking and dwell clicking to your own web application.
+		</p>
+		<p>
+			Check out the
+			<a href="https://github.com/1j01/vision/blob/main/core/README.md#vision-api">API
+				documentation</a>
+			<!-- <a href="https://www.npmjs.com/package/vision-hft">API documentation</a> -->
+			for more information.
+		</p>
+		<p>
+			<a href="https://jspaint.app/about">JS Paint</a> uses V.I.S.I.O.N. for its Dwell Clicker and Head Tracker
+			features.
+			<a href="https://jspaint.app/#enlarge-ui,dwell-clicker,head-tracker,vertical-color-box-mode,easy-undo">Click
+				here to launch JS Paint in Head Tracker mode</a>.
+		</p>
+	</section>
+	<section class="page-section">
+		<h2>Source Code</h2>
+		<p><a href="https://github.com/1j01/vision">Open source on GitHub.</a> MIT-licensed.</p>
+	</section>
+	<section class="page-section">
+		<h2>Feedback</h2>
+		<p>
+			Please <a href="mailto:isaiahodhner@gmail.com">email me</a> with any feedback or questions,
+			or <a href="https://github.com/1j01/vision/issues">open an issue on GitHub</a>.
+		</p>
+	</section>
+	<footer>
+		<nav>
+			<a href="index.html">Home</a>
+			<a href="https://github.com/1j01/vision">GitHub</a>
+			<a href="goodies.html">Goodies</a>
+			<a href="works-with.html">Companion Software</a>
+			<a href="privacy.html">Privacy Policy</a>
+			<a href="mailto:isaiahodhner@gmail.com">Send Email</a>
+			<!-- <a href="privacy.html">Privacy Policy</a> -->
+			<!-- <a href="api.html">API</a> -->
+			<!-- <a href="cli.html">CLI</a> -->
+			<!-- <a href="contact.html">Contact</a> -->
+		</nav>
+		<p>
+			&copy; 2026 Isaiah Odhner
+		</p>
+	</footer>
+	<script defer src="core/vision.js"></script>
+	<!-- `<script type="module">` is implicitly deferred, so this will load after the library despite `defer` on the library -->
+	<script type="module" src="demo.js"></script>
+
+	<!--
+		TODO:
+			"screenshot": "https://Vision.js.org/images/TODO/screenshot.png",
+			"potentialAction": {
+				"@type": "SearchAction",
+				"target": "https://Vision.js.org/search?q={search_term_string}",
+				"query-input": "required name=search_term_string"
+			},
+			"softwareRequirements": "https://Vision.js.org/docs/supporting/requirements",
+			"sameAs" : [
+				"https://en.wikipedia.org/wiki/Visual_Studio_Code",
+				"https://twitter.com/code",
+				"https://www.youtube.com/code",
+				"https://www.tiktok.com/@vscode",
+				"https://github.com/microsoft/vscode"
+			],
+			"operatingSystem": "Mac, Linux, Windows",
+
+			"downloadUrl": "https://Vision.js.org/download",
+			"If the file can be downloaded, URL to download the binary."
+			that doesn't sound quite right, but VS Code uses it for the download page.
+			"installUrl": "https://Vision.js.org/download",
+			"URL at which the app may be installed, if different from the URL of the item."
+			that sounds more like it's intended for a download page
+	-->
+	<script type="application/ld+json">
+		{
+			"@context" : "http://schema.org",
+			"@type" : "SoftwareApplication",
+			"name" : "V.I.S.I.O.N.",
+			"softwareVersion": "2.9.0",
+			"offers": {
+				"@type": "Offer",
+				"price": "0",
+				"priceCurrency": "USD"
+			},
+			"applicationCategory": "UtilitiesApplication",
+			"applicationSubCategory": "Accessibility",
+			"permissions": "Camera",
+			"datePublished": "2024-10-20",
+			"operatingSystem": "Linux, Windows",
+			"logo": "https://Vision.js.org/images/vision-logo-512.png",
+			"releaseNotes": "https://github.com/1j01/vision/releases",
+			"license": "https://github.com/1j01/vision/blob/main/LICENSE.txt",
+			"url" : "https://Vision.js.org",
+			"abstract": "Hands-free computer control.",
+			"description": "Control your computer with just a webcam.",
+			"isAccessibleForFree": true,
+			"isFamilyFriendly": true,
+			"keywords": "camera mouse, mouse, camera, webcam, head tracker, head tracking, facial recognition, face tracker, face tracking, headmouse, facial mouse, facemesh, eye tracker, eye tracking, eye gaze, accessibility, assistive-technology, cursor, pointer, pointing, input method, hands-free, handsfree, desktop automation, telekinesis",
+			"author": {
+				"@type": "Person",
+				"name": "Isaiah Odhner"
+			},
+			"publisher": {
+				"@type": "Person",
+				"name": "Isaiah Odhner"
+			},
+			"maintainer": {
+				"@type": "Person",
+				"name": "Isaiah Odhner"
+			},
+			"sameAs" : [
+				"https://github.com/1j01/vision",
+				"https://www.npmjs.com/package/vision-hft"
+			]
+		}
+	</script>
+</body>
+
+</html>

@@ -1,0 +1,106 @@
+#custom-menu-bar {
+	-webkit-app-region: no-drag;
+	height: 26px;
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
+	padding-left: 6px;
+	background-color: #161b22;
+	border-bottom: 1px solid #30363d;
+}
+
+#custom-menu-bar:empty {
+	display: none;
+}
+
+#custom-menu-bar .menus {
+	height: auto;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	font-size: 12px;
+}
+
+#custom-menu-bar .menu-button {
+	appearance: none;
+	border: none;
+	background: transparent;
+	color: #c9d1d9;
+	height: 22px;
+	padding: 0 10px;
+	line-height: 22px;
+	border-radius: 4px;
+	cursor: default;
+	transition: background-color 0.1s ease, color 0.1s ease;
+}
+
+#custom-menu-bar .menu-button:hover,
+#custom-menu-bar .menu-button.highlight {
+	background: #21262d;
+	color: #f0f6fc;
+}
+
+#custom-menu-bar .menu-button.active {
+	background: #30363d;
+	color: #58a6ff;
+}
+
+.menu-popup {
+	background: #161b22;
+	border: 1px solid #30363d;
+	border-radius: 6px;
+	box-shadow: 0 12px 28px rgba(0, 0, 0, 0.65);
+	padding: 4px;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	font-size: 12px;
+	color: #c9d1d9;
+	z-index: 1000000;
+}
+
+.menu-popup-table {
+	border-collapse: separate;
+	border-spacing: 0;
+}
+
+.menu-popup .menu-item {
+	height: 26px;
+	border-radius: 4px;
+	cursor: default;
+}
+
+.menu-popup .menu-item td {
+	padding: 0 10px;
+	white-space: nowrap;
+}
+
+.menu-popup .menu-item-label {
+	padding-right: 24px;
+}
+
+.menu-popup .menu-item-shortcut {
+	color: #8b949e;
+	font-size: 11px;
+	font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace;
+}
+
+.menu-popup .menu-item.highlight {
+	background: #21262d;
+	color: #58a6ff;
+}
+
+.menu-popup .menu-item[aria-disabled='true'] {
+	color: #484f58;
+	opacity: 0.6;
+}
+
+.menu-popup .menu-hr {
+	border: none;
+	border-top: 1px solid #30363d;
+	margin: 4px 6px;
+}
+
+.menu-hotkey {
+	text-decoration-thickness: 1px;
+	text-underline-offset: 2px;
+}

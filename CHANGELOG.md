@@ -1,0 +1,347 @@
+# Changelog
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Fixed
+- Fixed a couple translations in the Emoji locale
+- Fixed behavior when launching the desktop app while it was still opening. Previously it would open multiple windows, and if enabled, fight for control over the mouse cursor. Impatient users should no longer have to worry about double-clicking multiple times. ([issue #130](https://github.com/1j01/vision/issues/130))
+
+## [2.9.0] - 2026-06-02
+
+### Removed
+
+- Windows 7, 8, and 8.1 are no longer supported. Windows 10 or later is required to run the desktop app.
+  - (If building from source, the app may still function in later versions if Electron is downgraded to version 22.)
+
+### Fixed
+
+- Clicking on the app window's border (such as to resize it) using V.I.S.I.O.N. itself should no longer freeze the app on Windows. ([issue #69](https://github.com/1j01/vision/issues/69))
+
+## [2.8.0] - 2026-05-30
+
+> [!NOTE]
+> This will be the last release to support Windows 7, 8, and 8.1
+
+### Added
+
+- **Multi-monitor support**: You can now control the mouse cursor across all screens.
+  - This has been tested on Ubuntu 22 and Windows 11, but it might not work correctly on macOS.
+
+### Changed
+
+- On Windows, the desktop app now uses a custom title bar, and a custom menu bar powered by [OS-GUI.js](https://os-gui.js.org)
+- The background of the whole window is now light purple instead of white or black, matching the background color of the main part of the app.
+
+### Fixed
+
+- On Windows, the app should no longer freeze when using V.I.S.I.O.N. to click the application's own minimize or close buttons, or when right-clicking on its titlebar. ([issue #69](https://github.com/1j01/vision/issues/69))
+  - That said, clicking on the window's border (such as to resize the window) can still freeze it up. This should be fixed in the next release by updating Electron.
+- While waiting for camera access, V.I.S.I.O.N. now shows a message if it is taking longer than expected.
+- In the desktop app, V.I.S.I.O.N. now tries to recover automatically if a subprocess crashes. ([issue #111](https://github.com/1j01/vision/issues/111))
+- V.I.S.I.O.N. no longer uses `alert()` to show error messages, which previously interrupted V.I.S.I.O.N.'s mouse control. These dialogs couldn't be dismissed without resorting to a physical mouse or keyboard because they blocked execution of code needed to handle mouse control. ([issue #96](https://github.com/1j01/vision/issues/96))
+- The desktop app's update dialogs should no longer block V.I.S.I.O.N.'s mouse control on macOS. ([electron issue #23319](https://github.com/electron/electron/issues/23319))
+- Improved error display styling and consistency.
+- The screen overlay window should now be hidden from Mission Control on macOS.
+- The error reporting system can now fail gracefully. This should fix an error that occurred on launch on Windows 7.
+
+## [2.7.0] - 2026-04-05
+
+### Changed
+
+- Removed "experimental" label from "Close eyes to start/stop" setting.
+
+### Added
+
+- Added a **General > Sound effects** setting, enabled by default, which plays sounds when you click, as well as giving audio feedback for the sleep gesture ("Close eyes to start/stop"). ([issue #125](https://github.com/1j01/vision/issues/125))
+- In the dwell clicker API, added `config.shouldClickThrough(el)` hook to allow ignoring elements and clicking behind them.
+  - By default, it will match elements with the class `.vision-click-through`.
+  - In most cases `pointer-events: none` can be used instead. The new API is useful for specifically blocking system mouse interaction without blocking V.I.S.I.O.N.. This is used in the archery mini-game on the website to temporarily disable system mouse interaction when you're using head tracking, to improve the accuracy of categorizing input methods on the scoreboard.
+- The demo on the website now includes the HUD, manual takeback support, and all clicking modes, and richly simulates mouse behavior that cannot simply be triggered by JS: text selection, opening dropdowns, context menus, and autoscroll. These features are not currently part of the embedding API, but help to showcase the capabilities of the desktop app. The archery mini-game keeps track of all different input methods separately on the scoreboard, and also now supports using a gamepad as a mouse for comparison.
+
+### Fixed
+
+- Fixed an issue where mouth movement would sometimes affect the cursor position, due to tracking points on the mouth. This was especially problematic for the "Open mouth to click" modes. It now specifically avoids tracking movement near the lips. ([issue #34](https://github.com/1j01/vision/issues/34))
+- Fixed the sleep gesture not working when the desktop app's window was in the background.
+- The sleep gesture should now be more reliable when eyes are briefly detected as open during the gesture.
+- Fixed the HUD not sticking to the bottom of the screen on mobile browsers when scrolling up.
+
+## [2.6.0] - 2026-03-21
+
+### Changed
+
+- In the web version, the cursor is now shown as the V.I.S.I.O.N. logo. <img src="https://raw.githubusercontent.com/1j01/vision/refs/heads/main/images/vision-logo.svg" height="32">
+- In browsers that support the permissions API, the camera will be enabled immediately if permission has already been granted.
+
+### Added
+
+- The heads-up display (screen overlay) will now fade out within a radius of the cursor, so as not to get in the way of seeing what you're clicking on.
+- The camera access error message will now animate to give visual feedback that something is happening in case the same error message is shown.
+- The demo on the website now supports clicking modes other than dwell clicking, as well as the heads-up display. (This uses unstable APIs for now.)
+
+### Fixed
+
+- Clarified translations of "Free" in many languages so it refers to unconstrained movement instead of "free of charge".
+- The desktop app's update checking dialogs now respect the selected language.
+- The "searching for head" icon will no longer show before connecting to a camera.
+
+## [2.5.0] - 2026-03-07
+
+### Added
+
+- Added Portuguese, Brazilian Portuguese, Russian, Indonesian, Urdu, Marathi, Vietnamese, Telugu, Hausa, Turkish, Punjabi, Swahili, Tagalog, Tamil, Persian, Thai, Javanese, Gujarati, Cebuano, Swedish, Polish, Egyptian Arabic, Ukrainian, Czech, Danish, Finnish, Hebrew, Hungarian, Norwegian, Slovak, Greek, Slovenian, Simplified Chinese, Waray, Chechen, Catalan, Serbian, Croatian, Tatar, Romanian, Basque, Emoji, Malay, Minnan, Esperanto, Uzbek, Armenian, and Bulgarian language options in the General > Language dropdown, bringing the total count of languages from 12 to 60.
+- The CLI is now partially localized. This uses the in-app language setting.
+- Enabled auto-scrolling with middle click in the desktop app on platforms other than Windows. This makes it easier to navigate the settings when using V.I.S.I.O.N.'s "Open mouth to click (with eye gestures)" mode, since V.I.S.I.O.N. doesn't currently provide mouse wheel scrolling, but it does let you middle click.
+
+### Fixed
+
+- On Windows, when V.I.S.I.O.N. is set to run at login, the mouse cursor should now appear as soon as V.I.S.I.O.N. starts moving it, without needing to move a physical mouse.
+- Fixed custom menus (such as File > Import Settings) missing until changing the language setting (or changing any setting and restarting). This was broken in the last release when introducing localization.
+- Fixed dwell clicking not working on first run (until any setting was changed).
+
+## [2.4.0] - 2026-02-28
+
+### Changed
+
+- Renamed "Open mouth to click" mode to "Open mouth to click (with eye modifiers)"
+- Increased default "Delay before drag" time to 800ms to make it easier to click without dragging. This was never meant to default to zero, although zero is sometimes useful. ([issue #118](https://github.com/1j01/vision/issues/118))
+  - If you've changed any setting, this new default will not take effect.
+
+### Added
+
+- **General > Language**: choose between English, Italian, German, Spanish, French, Dutch, Korean, Traditional Chinese, Hindi, Bengali, Arabic, and Japanese (with more to come!) ([issue #59](https://github.com/1j01/vision/issues/59))
+- Added two simplified variants of "Open mouth to click" mode ([issue #126](https://github.com/1j01/vision/issues/126))
+  - **Open mouth to click (simple)**: Left click only. Clicks may be prevented if both eyes are closed. Recommended mode to avoid accidental clicks.
+  - **Open mouth to click (ignoring eyes)**: Left click only. Eye state is fully ignored. This may be preferred if blink detection is not working correctly.
+- In the API, introduced an UNSTABLE method `Vision.initScreenOverlay` (working towards bringing more features from the desktop app to the web experience; see [issue #72](https://github.com/1j01/vision/issues/72))
+
+### Fixed
+- Fixed sporadic error "o.Facemesh is not a constructor" on load ([issue #113](https://github.com/1j01/vision/issues/113))
+- Fixed silent failure when trying to import settings if settings haven't been modified (due to trying to back up a settings file that doesn't necessarily exist yet)
+- It will now show a dialog if importing/exporting settings fails.
+- V.I.S.I.O.N. will no longer get stuck "enabled" if it fails to access the camera. The Start/Stop button should always toggle when clicked.
+- In case a specific camera has been selected, but the camera device ID has changed or the camera is no longer plugged in,
+  previously it showed an irrelevant error message ("Webcam does not support the required resolution. Please change your settings.") ([issue #122](https://github.com/1j01/vision/issues/122))
+  - It will now fall back to matching a camera by name in case the device ID has changed.
+  - It will show a more appropriate error message if it still can't find the camera.
+- In case a specific camera has been selected, but permissions have been revoked,
+  in which case the browser gives a fake list of devices and requesting a real device ID will not work: ([issue #122](https://github.com/1j01/vision/issues/122))
+  - It will now request access to any camera and then when granted (at which point it can see the real list of devices) it will request access to the configured device.
+  - This may cause multiple permission prompts in a row unless you specify to allow all cameras in the first prompt.
+- It will now show a slightly more general error message for `AbortError`, since this error can be received for reasons other than the camera being used by another program, and simply trying again can work in some cases.
+- The `dispose` method of Vision UI now correctly stops the animation loop.
+- Fixed a warning about canvas image data performance.
+- Fixed bloated desktop app build size (the last release got extra bloated ironically while trying to fix some of the bloat; now it should be much smaller)
+
+## [2.3.0] - 2026-02-14
+
+### Changed
+- In "Open mouth to click" mode, it should no longer click if both your eyes are closed. ([issue #106](https://github.com/1j01/vision/issues/106))
+- In "Open mouth to click" mode, it will now show eye visuals as red (indicating it's part of an active gesture) even after an eye is reopened, if the eye is modifying a click. This makes it easier to see when you're doing a modified click, and to know which eye is modifying the click.
+
+### Added
+- Now available for Linux!
+  - For most Linux distributions, you can download the `.AppImage` file, which should work without installation.
+    - You may need to make it executable first by right-clicking the file, selecting "Properties", going to the "Permissions" tab, and checking "Allow this file to run as a program" or "Is executable" or similar (depending on your file manager). Then you can double-click it to run it. See [How to run an AppImage](https://discourse.appimage.org/t/how-to-run-an-appimage/80) for more details.
+  - For Ubuntu, Mint, Kali, elementary OS, or Pop!_OS, the `.deb` package can also be used.
+  - For Fedora, RHEL, or openSUSE, the `.rpm` package can also be used.
+- For Windows, there is now an MSIX build.
+  - It's an alternative to the setup `.exe` that gets blocked by "Windows SmartScreen" (DumbScreen).
+  - To install: After downloading the `.msix` file, right click on it, select Properties, go to the Digital Signatures tab, select the embedded signature from the list, click Details, click View Certificate, and install the certificate. Then double click the `.msix` file. Then click "Restart as administrator" to restart the installer (you do not need to restart your computer, don't worry). Say Yes to allow App Installer to make changes to the device. Then click Install.
+  - (Soon to be published to the Windows Store! Hopefully!)
+- Added setting **General > Close eyes to start/stop**. With this enabled, you can toggle mouse control by holding both your eyes shut for a few seconds. ([issue #105](https://github.com/1j01/vision/issues/105))
+  - This lets you take breaks without needing to touch the mouse or keyboard. It's useful for watching videos, or just pausing to think without worrying about clicking on things accidentally. It's also great as a casual user for when you lean back away from the keyboard and mouse but then realize you want to interact with something. You can now do so while staying relaxed.
+- Added setting **General > Check for updates**. This lets you disable automatic update checking on startup, which can be useful in case new versions become incompatible with your operating system version. ([issue #83](https://github.com/1j01/vision/issues/83))
+- If the desktop app is running from source code, it will now offer to update to a new version directly through Git instead of sending you to the download page.
+
+### Fixed
+- Fixed slider labels overlapping when the window is narrow (like on a phone). ([issue #112](https://github.com/1j01/vision/issues/112))
+- The settings can now be scrolled when they overflow the window. (part of [issue #78](https://github.com/1j01/vision/issues/78))
+- It now shows a friendlier error message when camera settings can't be shown, on platforms where ffmpeg doesn't support the `-list_devices` option.
+- Documented `config.isHeld` in the dwell clicker API.
+
+## [2.2.0] - 2026-01-22
+
+### Changed
+
+- There's a **new dependency** (optional but recommended). If you are using `loadDependencies()`, it will be included automatically. If you are including dependencies manually, you can add it with:
+  ```html
+  <script src="node_modules/vision-hft/lib/OneEuroFilter.js"></script>
+  ```
+  This adds a One Euro Filter to smooth out head tilt values, which can be very jittery otherwise.
+- **Improved open mouth detection** by using mouth aspect ratio instead of a simple distance between two lip points. If you make a narrow "O" shape with your mouth, it will detect that more reliably. ([issue #97](https://github.com/1j01/vision/issues/97))
+- Tweaked layout of mouth and eye meters in cursor-attached HUD. Each meter is now anchored at its vertical center, and meters better avoid being occluded by the cursor or cut off.
+- Settings UI:
+  - Mirror setting is now grouped under "Video".
+  - Renamed "Head Tracking" section to "Cursor Movement"
+  - Point tracking settings are now grouped under "Point Tracking" subsection.
+  - Tweaked settings UI spacing.
+  - Controls are now disabled when inapplicable.
+  - Added tooltips to settings. Hover over each setting to see a description. ([issue #79](https://github.com/1j01/vision/issues/79))
+
+### Added
+
+- **Camera source** setting. You can now select your preferred camera from a dropdown.
+- **Open Camera Settings** button in desktop app. This opens the system camera settings dialog for your selected camera, if available. (Probably only works on Windows.) ([issue #110](https://github.com/1j01/vision/issues/110))
+- **Direct head tilt based control**
+  - **Tilt influence** slider. This lets you blend between using point tracking (existing behavior) and directly detected head tilt. ([issue #45](https://github.com/1j01/vision/issues/45))
+    - At 0% it will use only point tracking, as before. This moves the cursor according to visible movement of 2D points on your face within the camera's view, so it responds to both head rotation and translation.
+    - At 100% it will use only head tilt. This uses Facemesh's estimate of your face's orientation in 3D space, and ignores head translation. Note that this is smoothed, so it's not as responsive as point tracking. In this mode you never need to recenter by pushing the cursor to the edge of the screen.
+    - In between it will behave like an automatic calibration, subtly adjusting the point tracking to match the head tilt. This works by slowing down mouse movement that is moving away from the position that would be expected based on the head tilt, and (only past 80% on the slider) actively moving towards it.
+  - **Head tilt calibration settings.** You can adjust the horizontal and vertical tilt range and offset. This allows the head tilt feature to be used with different camera placements (above or below the screen) and postures, and lets you balance comfort+speed and precision. ([issue #103](https://github.com/1j01/vision/issues/103))
+    - Recommended: switch to 100% tilt influence while adjusting these settings, so you can see the effect directly.
+- **Eye modifiers** in "Open mouth to click" mode.
+  - With your left eye closed, open your mouth to right click.
+  - With your right eye closed, open your mouth to middle click.
+  - This makes it a three-button mouse! Universal computer control.
+- Installer includes a new animated loading GIF. ([issue #86](https://github.com/1j01/vision/issues/86))
+- Added a new [Goodies](https://Vision.js.org/goodies) page to the website, with wallpaper downloads and text art.
+
+### Fixed
+
+- Fixed a crash on launch on macOS 10.14 with Xcode 10.3
+- The yellow status text at the bottom of the screen now avoids the taskbar on Windows and the dock on macOS. ([issue #76](https://github.com/1j01/vision/issues/76))
+- The screen overlay will now adapt to screen resolution changes.
+
+## [2.1.0] - 2026-01-14
+
+### Changed
+
+
+- **Improved blink detection** by using eye aspect ratio instead of a simple distance between two eyelid points.
+- **Removed minimum time between clicks** for the "Wink to click" and "Open mouth to click" modes. You can now double click naturally, as long as you can keep the cursor still.
+- **Stabilized blink and open mouth detection** by using a separate threshold for opening and closing. This means it won't rapidly oscillate between open and closed states when on the edge of open and closed.
+- **Involuntary blinks** should now be ignored in most cases.
+- "Wink to click" and "Open mouth to click" are no longer labeled as experimental.
+- **Redesigned settings**: settings are now grouped into collapsible sections.
+- Tons of cleanup of the codebase, and development process improvements.
+
+### Added
+
+- **You can now click and drag** with the "Wink to click" and "Open mouth to click" modes.
+- **Motion threshold** slider, similar to the setting in [eViacam](https://eviacam.crea-si.com/). This helps keep the mouse still when you stop moving your head, at the cost of precision.
+- **Delay before dragging** slider, which prevents moving the mouse during a click. This makes it easier to perform single and double clicks in clicking modes that allow dragging. You might want to set it to zero if you're going to be drawing on a canvas, or crank it up if you don't need to drag anything.
+- Blink detection includes a visualization in the camera view. It may make it look like you're wearing glasses. ðŸ˜Ž
+- Open mouth detection includes a visualization in the camera view. This is drawn as two lines for now.
+- **Cursor HUD**: Visual feedback is now shown near the mouse cursor for blink detection and open mouth detection, so you can be confident when it's clicking, even if what you're clicking on doesn't respond with any visual feedback.
+- **Update checking**: The app will now automatically check for updates on startup. You'll still have to download the new installer yourself for now.
+
+### Fixed
+
+![manual takeback indicator](https://raw.githubusercontent.com/1j01/vision/main/images/manual-takeback.svg)
+
+- Manual takeback indicator (hand on mouse with arrows) now shows regardless of clicking mode.
+- Status text at bottom of screen now correctly reflects enabled/disabled state regardless of clicking mode.
+- Removed visual offsetting of facemesh dots overlay by the previous movement from the point tracking, which should no longer provide any smoothing benefit since the facemesh pipeline has been updated in the last release and now runs within one frame.
+
+## [2.0.0] - 2026-01-07
+
+### Changed
+
+- V.I.S.I.O.N. once again requires `unsafe-eval` in the Content Security Policy in Chrome, due to usage of WebAssembly. See [this Chromium issue](https://issues.chromium.org/issues/41457889).
+- New dependencies must be included as script tags if not using `loadDependencies()`:
+  ```html
+  <script src="node_modules/vision-hft/lib/face_mesh/face_mesh.js"></script>
+  <script src="node_modules/vision-hft/lib/face-landmarks-detection.min.js"></script>
+  ```
+- Updated facemesh pipeline, improving performance significantly, and opening the door to implementing blink detection.
+  - A web worker is no longer used for facemesh, however one is still used for clmtrackr.
+- stats.js performance monitor, if enabled, now scrolls with the page, using `fixed` positioning instead of `absolute`.
+- A friendly "webcam may already be in use" message is now shown also for `AbortError` in Firefox.
+
+### Added
+- You can now disable dwell clicking in the desktop app without disabling mouse movement, by setting "Clicking mode" to "Off". ([issue #63](https://github.com/1j01/vision/issues/63))
+- A first version of blink detection for clicking is now available in the desktop app (under the "Clicking mode" setting).
+  - This needs refinement to avoid false positives (likely including a threshold setting). Expect undesired clicks for now.
+  - You can't click and drag with this method yet, only perform single clicks.
+  - I found there to be significant latency in my testing.
+- A first version of open mouth detection for clicking is now available in the desktop app (under the "Clicking mode" setting).
+  - It takes some skill to open your mouth without moving the cursor.
+  - You can't click and drag with this method yet, only perform single clicks.
+  - I found there to be significant latency in my testing.
+- [Sentry](https://sentry.io/) is now used for error reporting in the desktop app.
+  - No personally identifiable information is collected, only stack traces and environment details.
+  - (Only the main process is monitored for now, due to the technical hurdles of sandboxing.)
+
+### Fixed
+- The dwell clicking indicator (shrinking red circle) should no longer show while disabled.
+- The desktop app now takes into account the screen scale factor (including changes at runtime) when positioning the mouse, so it should reach the edges of the screen correctly on high-DPI displays. ([issue #64](https://github.com/1j01/vision/issues/64))
+  - Tested only on Windows. Hopefully this is also a fix for macOS and Linux, but it COULD have the opposite effect. I am currently unable to test on those platforms due to hardware and software issues.
+
+## [1.2.0] - 2024-12-17
+
+### Deprecated
+- `Vision.cleanupDwellClicking()` is deprecated in favor of calling `dispose()` on the object returned by `Vision.initDwellClicking()`.
+
+### Changed
+- The V.I.S.I.O.N. UI no longer includes a stats.js performance monitor by default. You can still enable it by passing `{statsJs: true}` to `Vision.init()` and, if needed, also to `Vision.loadDependencies()`.
+
+### Added
+- `Vision.init()` now returns an object with a `dispose()` method, which you can call to stop head tracking and remove the UI.
+- The object returned by `Vision.initDwellClicking()` now has a `dispose()` method as well, which you can use instead of `Vision.cleanupDwellClicking()`.
+
+### Fixed
+- `Vision.cleanupDwellClicking()` now handles multiple dwell clickers, not that I know of any use case for that.
+
+## [1.1.0] - 2024-10-20
+
+### Added
+- Start/stop button. This toggles head tracking, and, in the desktop app, dwell clicking as well. In the web library, dwell clicking is set up separately, and is not currently controlled by this button (or the keyboard shortcut F9).
+- Desktop app now supports dwell clicking. This means you can use V.I.S.I.O.N. with lots of software not designed with head tracking in mind. I just played a game of Mahjongg, and it worked well.
+- Settings are now persisted, both in the desktop app and in the browser.
+- Desktop app includes menu items for exporting and importing settings.
+- Desktop app now remembers the window size and position.
+- Desktop app lets you regain manual control by simply moving the mouse, pausing temporarily, and resuming when you stop moving the mouse.
+- Friendly error handling for different camera access failure scenarios.
+- Command line interface to control the desktop app, supporting `--start` and `--stop` to toggle head tracking.
+- API documentation.
+- Website at [Vision.js.org](https://Vision.js.org/).
+- Parameter validation.
+- `vision.js` includes a CommonJS export, untested. I'm only testing script tag usage. I hope to switch to ES modules soon.
+- `beforeDispatch()`/`afterDispatch()` callbacks for detecting untrusted gestures, outside of an event where you could use `event.isTrusted`.
+- `beforePointerDownDispatch()`/`afterReleaseDrag()` callbacks for JS Paint to replace accessing global `pointers` array.
+- `initDwellClicking` returns an object `{paused}` which lets you pause and resume dwell clicking.
+
+### Fixed
+- Function `average_points` was missing. It existed in JS Paint, the only place I had tested the library, since I was extracting the code from JS Paint.
+- Similarly, styles for the dwell click indicator and hover halo were missing or not applying. (Since they were provided by CSS in JS Paint, I didn't notice, in my rushed testing.)
+- The JS assumed the existence of a global `pointer_active` from JS Paint. This has been replaced with `config.isHeld()`.
+- Missing `facemesh.worker.js` file.
+- "Mirror" checkbox was too easy to accidentally click due to a large `<label>` (which acts as a hit region).
+
+### Changed
+- The software now starts disabled (by default), to avoid clicking on things before you're ready. This is especially important for the desktop app. The installer on Windows actually installs and launches the app without any interaction, so it would be *very surprising* if it started clicking right away.
+- The webcam view now shrinks to fit the window.
+- Sliders now have labels for their min and max values, and are widened to make it easier to click precisely.
+- Controls are themed purple.
+- All CSS classes are now prefixed with `vision-`.
+- `shouldDrag`, `noCenter`, `retarget`, `isEquivalentTarget`, and `dwellClickEvenIfPaused` are now optional for `initDwellClicking`.
+- You must include a new script `no-eval.js` if you are including V.I.S.I.O.N.'s dependencies manually. If you are using `loadDependencies()`, it is included automatically.
+- V.I.S.I.O.N. no longer requires `unsafe-eval` in the Content Security Policy! This is great, because now I can feel better about usage in Electron, both for the V.I.S.I.O.N. desktop app and for JS Paint.
+- Globals used by the Electron app (`moveMouse`, `onShortcut`, etc.) are now namespaced under `window.electronAPI`. For `moveMouse`, use `Vision.onPointerMove` instead.
+- Will no longer set global `pointers` to an empty array before dispatching `pointerdown` or after releasing a drag. Replaced with `config.beforePointerDownDispatch()` and `config.afterReleaseDrag()`
+
+## [1.0.0] - 2021-05-20
+### Added
+- Head tracking based on [Clmtrackr](https://github.com/auduno/clmtrackr), [Facemesh](https://github.com/tensorflow/tfjs-models/tree/master/facemesh#mediapipe-facemesh), and [jsfeat](https://github.com/inspirit/jsfeat).
+- Dwell clicker API generalized and extracted from [JS Paint](https://github.com/1j01/jspaint).
+- [Electron](https://electronjs.org/) app for desktop (not yet packaged for distribution).
+
+
+[Unreleased]: https://github.com/1j01/vision/compare/v2.9.0...HEAD
+[2.9.0]: https://github.com/1j01/vision/compare/v2.8.0...v2.9.0
+[2.8.0]: https://github.com/1j01/vision/compare/v2.7.0...v2.8.0
+[2.7.0]: https://github.com/1j01/vision/compare/v2.6.0...v2.7.0
+[2.6.0]: https://github.com/1j01/vision/compare/v2.5.0...v2.6.0
+[2.5.0]: https://github.com/1j01/vision/compare/v2.4.0...v2.5.0
+[2.4.0]: https://github.com/1j01/vision/compare/v2.3.0...v2.4.0
+[2.3.0]: https://github.com/1j01/vision/compare/v2.2.0...v2.3.0
+[2.2.0]: https://github.com/1j01/vision/compare/v2.1.0...v2.2.0
+[2.1.0]: https://github.com/1j01/vision/compare/v2.0.0...v2.1.0
+[2.0.0]: https://github.com/1j01/vision/compare/v1.2.0...v2.0.0
+[1.2.0]: https://github.com/1j01/vision/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/1j01/vision/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/1j01/vision/releases/tag/v1.0.0
