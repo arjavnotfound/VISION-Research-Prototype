@@ -69,13 +69,14 @@
 	// .----------------------------.
 	// | Theming                    |
 	// '----------------------------'
-	"workbench.colorTheme": "fairyfloss",
+	"workbench.colorTheme": "Default Dark Modern",
 	"workbench.colorCustomizations": {
 		"[fairyfloss]": {
 			"terminal.ansiMagenta": "#f36aff", // hard to see npm errors otherwise
 			"terminal.ansiBrightMagenta": "#f8adff", // not sure if needed, but figured I'd override the set of magentas
 		}
 	},
+	"workbench.iconTheme": "symbols",
 	// .------------------------- - .
 	// | Uncategorised settings
 	// '------------------------- - .

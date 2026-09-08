@@ -27,7 +27,6 @@ function loadNative() {
 	try {
 		native = bindings('win_relative_mouse');
 	} catch (error) {
-		console.error('Failed to load win_relative_mouse native module. Relative mouse move workaround will be skipped.', error);
 		native = null;
 	}
 
@@ -46,17 +45,24 @@ function ensureInitialRelativeMouseMove() {
 	}
 
 	const mod = loadNative();
-	if (!mod || typeof mod.sendRelativeMouseMove !== 'function') {
+	if (mod && typeof mod.sendRelativeMouseMove === 'function') {
+		sentInitialRelativeMove = true;
+		try {
+			mod.sendRelativeMouseMove(1, 0);
+		} catch (error) {
+			console.error('Failed to send initial relative mouse move.', error);
+		}
 		return;
 	}
 
-	sentInitialRelativeMove = true;
-
 	try {
-		// A tiny relative move is enough to wake up the cursor.
-		mod.sendRelativeMouseMove(1, 0);
+		const koffi = require('koffi');
+		const user32 = koffi.load('user32.dll');
+		const mouse_event = user32.func('void mouse_event(uint32 dwFlags, uint32 dx, uint32 dy, uint32 dwData, uintptr dwExtraInfo)');
+		sentInitialRelativeMove = true;
+		mouse_event(1, 1, 0, 0, 0);
 	} catch (error) {
-		console.error('Failed to send initial relative mouse move.', error);
+		// Non-critical, can be skipped
 	}
 }
 

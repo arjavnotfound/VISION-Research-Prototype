@@ -23,6 +23,9 @@ const sharedDebRpmOptions = {
 
 /** @type {import('@electron-forge/shared-types').ForgeConfig} */
 module.exports = {
+	rebuildConfig: {
+		onlyModules: [],
+	},
 	packagerConfig: {
 		icon: "./images/vision-logo",
 		name: "V.I.S.I.O.N.",
