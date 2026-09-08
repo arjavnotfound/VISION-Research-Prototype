@@ -26,7 +26,7 @@ function loadNative() {
 
 	try {
 		native = bindings('win_relative_mouse');
-	} catch (error) {
+	} catch (_error) {
 		native = null;
 	}
 
@@ -61,7 +61,7 @@ function ensureInitialRelativeMouseMove() {
 		const mouse_event = user32.func('void mouse_event(uint32 dwFlags, uint32 dx, uint32 dy, uint32 dwData, uintptr dwExtraInfo)');
 		sentInitialRelativeMove = true;
 		mouse_event(1, 1, 0, 0, 0);
-	} catch (error) {
+	} catch (_error) {
 		// Non-critical, can be skipped
 	}
 }

@@ -1946,7 +1946,9 @@ Vision._initInner = function (div, initOptions, reinit) {
 			if (playSound) {
 				playSound("middleClickPress", { volume: 3, playbackRate: 1.5 });
 			}
-		} catch (_e) {}
+		} catch (_e) {
+			// Non-critical audio notification error
+		}
 
 		showToast("⌨️ Built-in On-Screen Keyboard Opened");
 
@@ -2788,6 +2790,39 @@ You may want to turn this off if you're drawing on a canvas, or increase it if y
 	let paused = true;
 	let pointTracker;
 
+	const handleTrackingLoss = (reason = "tracking-loss") => {
+		const buttonNames = ["left", "middle", "right"];
+		for (let buttonIndex = 0; buttonIndex < 3; buttonIndex++) {
+			if (buttonStates[buttonNames[buttonIndex]]) {
+				buttonStates[buttonNames[buttonIndex]] = false;
+				if (setMouseButtonState) {
+					try {
+						setMouseButtonState(buttonIndex, false);
+					} catch (err) {
+						console.error(`[Vision] Failed to release button ${buttonNames[buttonIndex]} on ${reason}:`, err);
+					}
+				}
+			}
+		}
+		mouseButtonUntilMouthCloses = -1;
+		lastMouseDownTime = -Infinity;
+		blinkInfo = null;
+		mouthInfo = null;
+		foreheadInfo = null;
+		eyebrowGestureProgress = 0;
+		sleepGestureProgress = 0;
+		isMouthScrolling = false;
+		mouthScrollDirection = 0;
+
+		updateInputFeedback?.({
+			headNotFound: true,
+			blinkInfo: null,
+			mouthInfo: null,
+			foreheadInfo: null,
+			eyebrowGestureProgress: 0,
+		});
+	};
+
 	// Named lists of facemesh landmark indices
 	const MESH_ANNOTATIONS = {
 		silhouette: [
@@ -3099,13 +3134,18 @@ You may want to turn this off if you're drawing on a canvas, or increase it if y
 	const stopCameraStream = () => {
 		if (cameraVideo.srcObject) {
 			for (const track of cameraVideo.srcObject.getTracks()) {
-				track.stop();
+				try {
+					track.stop();
+				} catch (err) {
+					console.warn("[Vision] Error stopping camera track:", err);
+				}
 			}
 		}
 		cameraVideo.srcObject = null;
 	};
 
 	const reset = () => {
+		handleTrackingLoss("system-reset");
 		stopCameraStream();
 		clmTrackingStarted = false;
 		cameraFramesSinceFacemeshUpdate.length = 0;
@@ -3129,83 +3169,23 @@ You may want to turn this off if you're drawing on a canvas, or increase it if y
 	window._Vision_faceLandmarksDetectionAlert = (message) => {
 		// TODO: i18n (it's just one message; we could check for the string (or not) and translate it)
 		// const isContextCreationMessage = message === "Failed to create WebGL canvas context when passing video frame.";
-				errorMessage.textContent = `${t("common.warningIcon", { defaultValue: "⚠️" })} ${message}`;
+		errorMessage.textContent = `${t("common.warningIcon", { defaultValue: "⚠️" })} ${message}`;
 		errorMessage.hidden = false;
 	};
 
 	const cameraAccessSlowWarningDelayMS = 5000;
 	let cameraAccessSlowWarningTimeoutID;
+	let isCameraAcquisitionInProgress = false;
 	useCameraButton.onclick = Vision.useCamera = async (optionsOrEvent = {}) => {
-		// Phases:
-		// 1. "tryPreferredCamera"
-		//    Use the configured device ID to try to access the preferred camera.
-		//    If the permission has been revoked, the browser may
-		//    switch to a mode where `enumerateDevices` gives FAKE data
-		//    and `getUserMedia` will fail with OverconstrainedError
-		//    when trying to access a real device
-		//    (without even triggering a permission prompt that might
-		//    lead to getting the real list of devices.)
-		// 2. "justGetPermission"
-		//    Request any camera in order to get camera permission
-		//    in general and get real data from `enumerateDevices`
-		//    in phase 3.
-		//    Close the stream immediately, as it may not be the
-		//    stream we want, and we can't tell, as far I know.
-		//    Then populate the camera list with real data.
-		// 3. "retryPreferredCamera"
-		//    Now that we have a real list of devices,
-		//    and are allowed to access real devices,
-		//    try again with a specific device ID.
-		//    If there's a match by name and not ID, we use that.
-		//
-		// Q: Why not get rid of phase 1? Shouldn't 2+3 handle it?
-		// In Electron, closing the stream and re-requesting access
-		// often gives a "camera in use" error.
-		// Plus, _ideally_ phase 1 means it can connect faster in browsers.
-		// However, phase 1 may only get OverconstrainedError in browsers
-		// as it's implemented.
-		// We could get rid of phase 1 in browsers, basically separating the flows.
-		// But...
-		// I wonder if revoking camera access is what changes device IDs,
-		// and if device IDs changing is what gives OverconstrainedError,
-		// not the "fake device list" behavior. Is it perhaps only hiding labels in that mode,
-		// but separately permanently scrambling IDs as a single event?
-		// If device IDs are changed, storing the new device ID to try in phase 1
-		// might make phase 1 work as an optimization in browsers.
-		//
-		// Q: If Electron has such a problem, would it not occur in the later phases?
-		// Phase 2+3 should never occur in Electron.
-		// In fact, we can guard against this.
-		// Although, if phase 2+3 are only enterred on failure,
-		// it can't really be a problem, can it?
-		//
-		// Q: Will this cause unnecessary prompts?
-		// In the case of one existing camera, no.
-		// In the case that there are multiple existing cameras,
-		// and the user grants access to a different one than is configured,
-		// it may cause an extra prompt.
-		// In Firefox, you can choose to allow all cameras with a checkbox.
-		// If you check that box, or select the matching camera before clicking Allow,
-		// there should be only one prompt.
-		//
-		// Q: Why not use a library for this?
-		// The mic-check package uses a similar approach, but seems to
-		// encourage a pattern where nice error handling is applied
-		// only to a "just get permission" equivalent phase,
-		// whereas by using recursion or separating out the error handling
-		// into a function, one can handle errors nicely always.
-		// mic-check provides only the one phase, and presumably
-		// is meant for a two-phase solution.
-		//
-		// Q: What happens if there are multiple overlapping calls to `useCamera`?
-		// I don't know. TODO: test this.
-		//
-		// P.S. I gave a talk about this at Rubber Duck Conf 2026
-		// You can view the slides here: https://websim.com/@1j01/ughaaaaaa
-
 		await settingsLoadedPromise;
 
 		const phase = optionsOrEvent.phase ?? "tryPreferredCamera";
+
+		if (isCameraAcquisitionInProgress && phase === "tryPreferredCamera") {
+			console.log("[Vision] Camera acquisition already in progress; skipping duplicate call.");
+			return;
+		}
+		isCameraAcquisitionInProgress = true;
 
 		const constraints = {
 			audio: false,
@@ -3232,6 +3212,7 @@ You may want to turn this off if you're drawing on a canvas, or increase it if y
 		}, cameraAccessSlowWarningDelayMS);
 		console.log("Vision.useCamera phase", phase, "constraints", constraints);
 		navigator.mediaDevices.getUserMedia(constraints).then(async (stream) => {
+			isCameraAcquisitionInProgress = false;
 			clearTimeout(cameraAccessSlowWarningTimeoutID);
 			if (phase === "justGetPermission") {
 				for (const track of stream.getTracks()) {
@@ -3251,11 +3232,27 @@ You may want to turn this off if you're drawing on a canvas, or increase it if y
 			populateCameraList();
 			reset();
 
+			// Fail-safe: attach track lifecycle listeners for unexpected camera disconnects or hardware loss
+			for (const track of stream.getVideoTracks()) {
+				track.addEventListener('ended', () => {
+					console.warn("[Vision] Camera track ended (unplugged, disabled, or revoked).");
+					handleTrackingLoss("camera-disconnected");
+					showError(t("video.errors.cameraDisconnected", { defaultValue: "Webcam was disconnected or stopped unexpectedly." }));
+					useCameraButton.hidden = false;
+				});
+				track.addEventListener('mute', () => {
+					console.warn("[Vision] Camera track muted.");
+					handleTrackingLoss("camera-muted");
+				});
+			}
+
 			cameraVideo.srcObject = stream;
 			useCameraButton.hidden = true;
 			errorMessage.hidden = true;
 		}, async (error) => {
+			isCameraAcquisitionInProgress = false;
 			clearTimeout(cameraAccessSlowWarningTimeoutID);
+			handleTrackingLoss("camera-acquisition-failed");
 			console.log("Vision.useCamera phase", phase, "error", error);
 			if (
 				phase === "tryPreferredCamera" &&
@@ -3719,9 +3716,7 @@ You may want to turn this off if you're drawing on a canvas, or increase it if y
 						clearTimeout(fallbackTimeoutID);
 
 						if (!facemeshPrediction) {
-							blinkInfo = null;
-							mouthInfo = null;
-							foreheadInfo = null;
+							handleTrackingLoss("facemesh-no-face");
 							return;
 						}
 						facemeshPrediction.faceInViewConfidence = 0.9999; // TODO: any equivalent in new API?
@@ -4210,9 +4205,11 @@ You may want to turn this off if you're drawing on a canvas, or increase it if y
 								}
 							}
 						}
-					}, () => {
+					}, (err) => {
+						console.error("[Vision] Facemesh estimation failed:", err);
 						facemeshEstimating = false;
 						facemeshFirstEstimation = false;
+						handleTrackingLoss("facemesh-error");
 					});
 				}
 			}
@@ -4514,6 +4511,17 @@ You may want to turn this off if you're drawing on a canvas, or increase it if y
 
 			let [movementX, movementY] = pointTracker.getMovement();
 
+			const hasValidFace = Boolean(
+				(useFacemesh && facemeshPrediction) ||
+				(useClmTracking && face && faceScore >= faceScoreThreshold)
+			);
+
+			if (!hasValidFace) {
+				movementX = 0;
+				movementY = 0;
+				handleTrackingLoss("no-valid-face");
+			}
+
 			// Acceleration curves add a lot of stability,
 			// letting you focus on a specific point without jitter, but still move quickly.
 
@@ -4800,7 +4808,12 @@ You may want to turn this off if you're drawing on a canvas, or increase it if y
 
 	// Can't use requestAnimationFrame, doesn't work with webPreferences.backgroundThrottling: false (at least in some version of Electron (v12 I think, when I tested it), on Ubuntu, with XFCE)
 	const iid = setInterval(function animationLoop() {
-		draw(!paused || document.visibilityState === "visible" || isDesktopApp);
+		try {
+			draw(!paused || document.visibilityState === "visible" || isDesktopApp);
+		} catch (drawErr) {
+			console.error("[Vision] Unhandled exception in animationLoop:", drawErr);
+			handleTrackingLoss("draw-exception");
+		}
 	}, 15);
 
 	let autoDemo = false;
@@ -4846,6 +4859,7 @@ You may want to turn this off if you're drawing on a canvas, or increase it if y
 		mouseNeedsInitPos = true;
 		if (paused) {
 			pointerEl.style.display = "none";
+			handleTrackingLoss("tracking-paused");
 		}
 		updateStartStopButton();
 		notifyToggleState?.(!paused);
@@ -4904,6 +4918,9 @@ You may want to turn this off if you're drawing on a canvas, or increase it if y
 
 			clearInterval(iid);
 
+			// Fail-safe release of any held mouse buttons
+			handleTrackingLoss("vision-disposed");
+
 			// stopping camera stream is important, not sure about other resetting
 			reset();
 
@@ -4911,12 +4928,19 @@ You may want to turn this off if you're drawing on a canvas, or increase it if y
 			paused = true;
 
 			if (detector) {
-				detector.dispose();
+				try {
+					detector.dispose();
+				} catch (err) {
+					console.warn("[Vision] Error disposing detector:", err);
+				}
 				detector = null;
 			}
 			if (clmTracker) {
-				// not sure this helps clean up any resources
-				clmTracker.reset();
+				try {
+					clmTracker.reset();
+				} catch (err) {
+					console.warn("[Vision] Error resetting clmTracker:", err);
+				}
 			}
 
 			pointerEl.remove();

@@ -4,29 +4,26 @@
 // I'm making an exception for Sentry, since it could help track down installation issues.
 const path = require('path');
 const { app, globalShortcut, dialog, BrowserWindow, ipcMain } = require('electron');
-try {
-	const Sentry = require("@sentry/electron/main");
-	let sentryEnvironment = app.isPackaged ? "packaged" : "development";
+if (process.env.VISION_SENTRY_DSN) {
 	try {
-		// Look for marker file in packaged app root
-		const markerPath = path.join(process.resourcesPath, 'app/official-release.txt');
-		if (require('fs').existsSync(markerPath)) {
-			sentryEnvironment = "production";
+		const Sentry = require("@sentry/electron/main");
+		let sentryEnvironment = app.isPackaged ? "packaged" : "development";
+		try {
+			// Look for marker file in packaged app root
+			const markerPath = path.join(process.resourcesPath, 'app/official-release.txt');
+			if (require('fs').existsSync(markerPath)) {
+				sentryEnvironment = "production";
+			}
+		} catch (_error) {
+			// Ignore marker file errors
 		}
+		Sentry.init({
+			dsn: process.env.VISION_SENTRY_DSN,
+			environment: sentryEnvironment,
+		});
 	} catch (error) {
-		console.error("Error checking for official release marker file:", error);
+		console.error("Error initializing Sentry:", error);
 	}
-	Sentry.init({
-		dsn: "https://d02619b2adf1ec1ea0c6219e5cbb6f0d@o4507120033660928.ingest.us.sentry.io/4510658749202432",
-		environment: sentryEnvironment,
-	});
-	// Special handling for a very broken computer of mine
-	// so hopefully I can filter out the crashes that it gets
-	if (process.env.IS_BAD_COMPUTER === 'true') {
-		Sentry.setTag("is_bad_computer", "true");
-	}
-} catch (error) {
-	console.error("Error initializing Sentry:", error);
 }
 
 
@@ -216,9 +213,44 @@ if (secondInstanceOnlyArgs.some(arg => args[arg])) {
 // Normal app behavior continues here.
 
 const windowStateKeeper = require('electron-window-state');
-const { setMouseLocation: setMouseLocationWithoutTracking, getMouseLocation, click, mouseDown, mouseUp, pressKey } = require('./input-driver.js');
+const { setMouseLocation: setMouseLocationWithoutTracking, getMouseLocation, click, mouseDown, mouseUp, mouseUpSync, pressKey } = require('./input-driver.js');
+const { createMouseSafetyCoordinator } = require('./mouse-safety.js');
 const { ensureInitialRelativeMouseMove } = require('./win-relative-mouse.js');
 const screen = require('electron').screen; // Note: can't be used until ready event
+
+/** @type {BrowserWindow} */
+let appWindow;
+/** @type {BrowserWindow} */
+let screenOverlayWindow;
+
+let activeSettings = {};
+let enabled = true;
+let regainControlTimeout = null;
+
+function isClickingAllowed() {
+	if (regainControlTimeout || !enabled || activeSettings.clickingMode === 'off') {
+		return false;
+	}
+
+	// Failsafe: don't click if the window(s) are closed or destroyed.
+	if (
+		(!screenOverlayWindow || screenOverlayWindow.isDestroyed()) ||
+		(!appWindow || appWindow.isDestroyed())
+	) {
+		return false;
+	}
+	return true;
+}
+
+const mouseSafety = createMouseSafetyCoordinator({
+	mouseDown,
+	mouseUp,
+	emergencyMouseUpSync: mouseUpSync,
+	getClickingAllowed: isClickingAllowed,
+});
+
+mouseSafety.attachAppSafetyListeners(app);
+mouseSafety.attachProcessSafetyListeners(process);
 
 let screenScaleFactor = 1;
 function updateScreenScaleFactor() {
@@ -244,19 +276,8 @@ const { updateMenu, getCustomMenuBarModel, invokeMenuItemById } = require("./men
 const { installCrashRecovery } = require('./crash-recovery.js');
 
 // Allow recovering from WebGL crash unlimited times.
-// (To test the recovery, I've been using Ctrl+Alt+F1 and Ctrl+Alt+F2 in Ubuntu.
-// Note, if Ctrl + Alt + F2 doesn't get you back, try Ctrl+Alt+F7.)
 app.commandLine.appendSwitch("disable-gpu-process-crash-limit");
-// Allow auto-scrolling with middle click on platforms other than Windows.
-// This makes it easier to navigate the settings when using V.I.S.I.O.N.'s
-// "Open mouth to click (with eye gestures)" mode, since V.I.S.I.O.N. doesn't currently
-// provide a way to trigger mouse wheel events, but it does let you middle click.
 app.commandLine.appendSwitch("enable-blink-features", "MiddleClickAutoscroll");
-
-
-let activeSettings = {};
-
-let enabled = true;
 async function loadSettings() {
 	let data;
 	try {
@@ -435,11 +456,6 @@ function pruneMousePosHistory() {
 }
 
 
-/** @type {BrowserWindow} */
-let appWindow;
-/** @type {BrowserWindow} */
-let screenOverlayWindow;
-
 const createWindow = () => {
 	const appWindowState = windowStateKeeper({
 		defaultWidth: 750,
@@ -501,13 +517,22 @@ const createWindow = () => {
 	// Restore window state, and listen for window state changes.
 	appWindowState.manage(appWindow);
 
-	// Clean up overlay when the app window is closed.
+	mouseSafety.attachWindowSafetyListeners(appWindow, 'appWindow');
+
+	// Clean up overlay and mouse safety when the app window is closed.
 	appWindow.on('closed', () => {
-		appWindow = null; // not needed if calling app.exit(), which exits immediately, but useful if calling other methods to quit
-		// screenOverlayWindow?.close(); // doesn't work because screenOverlayWindow.closable is false
-		// app.quit(); // doesn't work either, because screenOverlayWindow.closable is false
-		app.exit(); // doesn't call beforeunload and unload listeners, or before-quit or will-quit
-		// Note: if re-assessing this, for macOS, make sure to handle the global shortcut, when the window doesn't exist.
+		appWindow = null;
+		mouseSafety.releaseAllMouseButtons('app-window-closed');
+		clearTimeout(monitorMousePositionTid);
+		clearTimeout(regainControlTimeout);
+		if (screenOverlayWindow && !screenOverlayWindow.isDestroyed()) {
+			try {
+				screenOverlayWindow.destroy();
+			} catch (_err) {
+				// Non-critical overlay destroy error on shutdown
+			}
+		}
+		app.quit();
 	});
 
 	// Helper for safely sending messages without spamming the console
@@ -540,7 +565,6 @@ const createWindow = () => {
 	// Allow controlling the mouse, but pause if the mouse is moved normally.
 	const thresholdToRegainControl = 10; // in pixels
 	const regainControlForTime = 2000; // in milliseconds, AFTER the mouse hasn't moved for more than mouseMoveRequestHistoryDuration milliseconds (I think)
-	let regainControlTimeout = null; // also used to check if we're pausing temporarily
 	let inputFeedback = {};
 	let primaryDisplay = screen.getPrimaryDisplay();
 	let virtualDisplayBounds = computeVirtualDisplayBounds();
@@ -591,54 +615,28 @@ const createWindow = () => {
 	monitorMousePosition();
 
 	ipcMain.on('moveMouse', async (_event, x, y, time) => {
-		// TODO: consider postponing getMouseLocation, if possible, to minimize latency,
-		// perhaps separating logic for pausing/resuming camera control out from the camera control itself.
-		// Update: I have done a test of extracting this. It works but note that it may change the
-		// effective scale of `thresholdToRegainControl` if the frequency of mouse position measurements changes.
-		// There is now the monitorMousePosition loop which could be merged with this
-		// (It was this hide-HUD-near-cursor feature that had me trying extracting this, but I decided to make it a separate loop for now,
-		// to preserve the behavior of `thresholdToRegainControl` and introduce the hide-HUD-near-cursor feature with minimal code changes.
-		// The downside being `getMouseLocation` is called in multiple loops in parallel.)
 		const curPos = await getMouseLocation();
 		curPos.x /= screenScaleFactor;
 		curPos.y /= screenScaleFactor;
-		// Assume any point in setMouseLocationHistory may be the latest that the mouse has been moved to,
-		// since setMouseLocation is asynchronous,
-		// or that getMouseLocation's result may be outdated and we've moved the mouse since then,
-		// since getMouseLocation is asynchronous.
+
 		pruneMousePosHistory();
 		const distances = mousePosHistory.map(({ point }) => Math.hypot(curPos.x - point.x, curPos.y - point.y));
 		const distanceMoved = distances.length ? Math.min(...distances) : 0;
-		// console.log("distanceMoved", distanceMoved);
+
 		if (distanceMoved > thresholdToRegainControl) {
-			// if (regainControlTimeout === null) {
-			// 	console.log("mousePosHistory", mousePosHistory);
-			// 	console.log("distances", distances);
-			// 	console.log("distanceMoved", distanceMoved, ">", thresholdToRegainControl, "curPos", curPos, "last pos", mousePosHistory[mousePosHistory.length - 1], "mousePosHistory.length", mousePosHistory.length);
-			// 	console.log("Pausing camera control due to manual mouse movement.");
-			// }
 			clearTimeout(regainControlTimeout);
 			regainControlTimeout = setTimeout(() => {
 				regainControlTimeout = null; // used to check if we're pausing
-				// console.log("Mouse not moved for", regainControlForTime, "ms; resuming.");
 				updateDwellClickingAndHUD();
 			}, regainControlForTime);
+			// Fail-safe: release any held mouse buttons when manual physical takeover occurs!
+			mouseSafety.releaseAllMouseButtons('manual-takeover');
 			updateDwellClickingAndHUD();
-			// Prevent immediately returning to manual control after switching to camera control
-			// based on head movement while in manual control mode.
-			// This is one of two places where we add the RETRIEVED system mouse position to `mousePosHistory`.
-			// It may be a good idea to split `mousePosHistory` into two arrays,
-			// say `setMouseLocationHistory` and `getMouseLocationHistory`,
-			// in order to handle maintaining manual control differently from switching to manual control,
-			// and/or for clarity of intent.
+
 			mousePosHistory.push({ point: { x: curPos.x, y: curPos.y }, time: performance.now(), from: "moveMouse" });
-		} else if (regainControlTimeout === null && enabled) { // (shouldn't really get this event if enabled is false)
-			// Note: there's no await here, not necessarily for a particular reason,
-			// although maybe it's better to send the 'moveMouse' event as soon as possible?
+		} else if (regainControlTimeout === null && enabled) {
 			setMouseLocationVision(x, y);
 		}
-		// const latency = performance.now() - time;
-		// console.log(`moveMouse: (${x}, ${y}), latency: ${latency}, distanceMoved: ${distanceMoved}, curPos: (${curPos.x}, ${curPos.y}), lastPos: (${lastPos.x}, ${lastPos.y})`);
 
 		trySendOverlayWindowMessage('moveMouse', x - virtualDisplayBounds.x, y - virtualDisplayBounds.y, time);
 	});
@@ -651,6 +649,11 @@ const createWindow = () => {
 			initialPos.y /= screenScaleFactor;
 		}
 		enabled = nowEnabled;
+
+		if (!nowEnabled) {
+			// Fail-safe: release any held simulated buttons when tracking disabled!
+			mouseSafety.releaseAllMouseButtons('tracking-disabled');
+		}
 
 		// Start immediately if enabled.
 		clearTimeout(regainControlTimeout);
@@ -672,6 +675,9 @@ const createWindow = () => {
 	ipcMain.on('setOptions', (_event, newOptions) => {
 		deserializeSettings(newOptions);
 		saveSettings();
+		if (activeSettings.clickingMode === 'off') {
+			mouseSafety.releaseAllMouseButtons('clicking-mode-off');
+		}
 	});
 
 	ipcMain.handle('getOptions', async () => {
@@ -690,24 +696,6 @@ const createWindow = () => {
 		return invokeMenuItemById(menuItemId, BrowserWindow.fromWebContents(event.sender));
 	});
 
-	function isClickingAllowed() {
-		if (regainControlTimeout || !enabled || activeSettings.clickingMode === 'off') {
-			return false;
-		}
-
-		// Failsafe: don't click if the window(s) are closed.
-		// This helps with debugging the closing/quitting behavior.
-		// It would also help to have a heartbeat to avoid clicking while paused in the debugger in other scenarios,
-		// and avoid the dwell clicking indicator from repeatedly showing while there's no connectivity between the processes.
-		if (
-			(!screenOverlayWindow || screenOverlayWindow.isDestroyed()) ||
-			(!appWindow || appWindow.isDestroyed())
-		) {
-			return false;
-		}
-		return true;
-	}
-
 	ipcMain.on('click', async (_event, x, y, _time) => {
 		if (!isClickingAllowed()) {
 			return;
@@ -719,58 +707,13 @@ const createWindow = () => {
 
 		await setMouseLocationVision(x, y);
 		await click(activeSettings.swapMouseButtons ? "right" : "left");
-
-		// const latency = performance.now() - time;
-		// console.log(`click: ${x}, ${y}, latency: ${latency}`);
 	});
 
-	// Note: buttonStates is redundant now that we do basically the same thing in the renderer process
-	// TODO: consider removing it, and renaming setMouseButtonState to triggerMouseUpOrDown
-	let buttonStates = {
-		left: false,
-		right: false,
-		middle: false,
-	};
 	ipcMain.handle('setMouseButtonState', async (_event, button, down) => {
-		// TODO: make sure the mouse button is released when disabling clicking ability
-		// (including exiting the app, I suppose!)
-		if (!isClickingAllowed()) {
-			return false;
-		}
-
-		let buttonName = "middle";
-		if (button !== 1) {
-			buttonName = (activeSettings.swapMouseButtons !== (button === 2)) ? "right" : "left";
-		}
-		let stateChanged = false;
-		if (down) {
-			if (!buttonStates[buttonName]) {
-				buttonStates[buttonName] = true;
-				await mouseDown(buttonName);
-				stateChanged = true;
-			}
-		} else {
-			if (buttonStates[buttonName]) {
-				buttonStates[buttonName] = false;
-				await mouseUp(buttonName);
-				stateChanged = true;
-			}
-		}
-
-		return stateChanged;
-
-		// const latency = performance.now() - time;
-		// console.log(`click: ${x}, ${y}, latency: ${latency}`);
+		return await mouseSafety.setMouseButtonState(button, down, Boolean(activeSettings.swapMouseButtons));
 	});
 
 	// Set up the screen overlay window.
-	// fullscreen is needed on Windows 11, since it seems to constrain the size to the work area otherwise
-	// fullscreen causes app to crash on macOS 10.14.6 with Xcode 10.3, Electron 20.0.1, Node.js 21.5.0
-	// with:
-	//   2026-01-18 04:58:14.966 Electron[24086:199877] *** Assertion failure in -[ElectronNSWindow titlebarAccessoryViewControllers], /BuildRoot/Library/Caches/com.apple.xbs/Sources/AppKit/AppKit-1671.60.112/AppKit.subproj/NSWindow.m:3439
-	//   [0118/045815.040421:WARNING:process_memory_mac.cc(93)] mach_vm_read(0x7ffee63e9000, 0x2000): (os/kern) invalid address (1)
-	// fullscreen on Linux: unknown, but previously it was enabled, so I'm leaving it as is for now.
-	// For multi-monitor, fullscreen is not used since it would only cover one display; explicit bounds are used instead.
 	const fullscreen = process.platform !== 'darwin' && !isMultiMonitor;
 	screenOverlayWindow = new BrowserWindow({
 		fullscreen,
@@ -799,6 +742,8 @@ const createWindow = () => {
 	});
 	screenOverlayWindow.setIgnoreMouseEvents(true);
 	screenOverlayWindow.setAlwaysOnTop(true, 'screen-saver');
+
+	mouseSafety.attachWindowSafetyListeners(screenOverlayWindow, 'screenOverlayWindow');
 
 	screenOverlayWindow.loadFile(`src/electron-screen-overlay.html`);
 	screenOverlayWindow.on('close', (event) => {

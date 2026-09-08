@@ -77,6 +77,7 @@ module.exports = [
 			"scripts/release/release.js",
 			"website/globs-for-deploy.js",
 			"eslint.config.js",
+			"tests/**",
 		],
 		"languageOptions": {
 			"globals": {
